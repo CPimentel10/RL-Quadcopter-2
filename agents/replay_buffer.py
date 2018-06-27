@@ -1,4 +1,4 @@
-from collections import deque, named_tuple
+from collections import deque, namedtuple
 import random
 
 
@@ -9,7 +9,7 @@ class ReplayBuffer:
         """Initialize a ReplayBuffer instance."""
         self.memory = deque(maxlen=mem_size)
         self.batch_size = batch_size
-        self.experience = named_tuple("Experience", field_names=[
+        self.experience = namedtuple("Experience", field_names=[
                                       'state', 'action', 'reward',
                                       'next_state', 'done'])
 

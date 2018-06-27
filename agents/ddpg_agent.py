@@ -1,11 +1,11 @@
-from ddpg_actor import Actor
-from ddpg_critic import Critic
-from ou_noise import OUNoise
-from replay_buffer import ReplayBuffer
+from agents.ddpg_actor import Actor
+from agents.ddpg_critic import Critic
+from agents.ou_noise import OUNoise
+from agents.replay_buffer import ReplayBuffer
 import numpy as np
 
 
-class DDPG:
+class DDPG_Agent:
     """Reinforcement learning agent that learns through DDPG."""
 
     def __init__(self, task):
@@ -30,8 +30,8 @@ class DDPG:
         self.critic_target = Critic(self.state_size, self.action_size)
 
         # Initialize target model parameters with local model parameters
-        self.actor_target.model.set_weights(self.actor_local.get_weights())
-        self.critic_target.model.set_weights(self.critic_local.get_weights())
+        self.actor_target.model.set_weights(self.actor_local.model.get_weights())
+        self.critic_target.model.set_weights(self.critic_local.model.get_weights())
 
         self.exploration_mu = 0
         self.exploration_theta = 0.15
@@ -48,8 +48,16 @@ class DDPG:
         self.gamma = 0.99  # discount factor
         self.tau = 0.01  # for soft update of target parameters
 
+        # Additional Parameters
+        self.best_score = -np.inf
+        self.total_reward = 0.0
+        self.count = 0
+        self.score = 0
+
     def reset_episode(self):
         """Reset episode to initial state."""
+        self.total_reward = 0.0
+        self.count = 0
         self.noise.reset()
         state = self.task.reset()
         self.last_state = state
@@ -57,18 +65,20 @@ class DDPG:
 
     def step(self, action, reward, next_state, done):
         """Take a step."""
+        self.total_reward += reward
+        self.count += 1
         # Save experience/reward
         self.memory.memorize(self.last_state, action, reward, next_state, done)
 
         # Learn if enough samples are available in memory.
-        if len(self.memory) > self.buffer_size:
+        if len(self.memory) > self.batch_size:
             experiences = self.memory.sample()
             self.learn(experiences)
 
     def act(self, state):
         """Returns actions for state(s) according to given policy."""
         state = np.reshape(state, [-1, self.state_size])
-        action = self.actor_local.predict(state)[0]
+        action = self.actor_local.model.predict(state)[0]
 
         # Add some noise to action for exploration and return
         return list(action + self.noise.sample())
@@ -76,6 +86,12 @@ class DDPG:
     def learn(self, experiences):
         """Update policy and value parameters using given batch of experience
         tuples."""
+
+        self.score = self.total_reward / \
+            float(self.count) if self.count else 0.0
+        if self.score > self.best_score:
+            self.best_score = self.score
+
         states = np.vstack([e.state for e in experiences if e is not None])
         actions = np.vstack(
             [e.action for e in experiences if e is not None]).astype(
